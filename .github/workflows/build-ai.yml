@@ -27,6 +27,7 @@ jobs:
           npm install \
             @tensorflow/tfjs@4.22.0 \
             @tensorflow-models/body-pix@2.2.1 \
+            @tensorflow-models/coco-ssd@2.2.3 \
             esbuild@0.25.9
 
           mkdir -p vendor
@@ -47,8 +48,22 @@ jobs:
             --external:@tensorflow/tfjs \
             --outfile=vendor/body-pix.min.js
 
+          cat > cocossd-entry.js <<'EOF'
+          import * as cocoSsd from '@tensorflow-models/coco-ssd';
+          window.cocoSsd = cocoSsd;
+          EOF
+
+          npx esbuild cocossd-entry.js \
+            --bundle \
+            --minify \
+            --platform=browser \
+            --format=iife \
+            --external:@tensorflow/tfjs \
+            --outfile=vendor/coco-ssd.min.js
+
           test -s vendor/tf.min.js
           test -s vendor/body-pix.min.js
+          test -s vendor/coco-ssd.min.js
 
           ls -lh vendor/
 
@@ -64,6 +79,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "AI files already exist"
           else
-            git commit -m "Build self-hosted AI assets"
+            git commit -m "Build v12 self-hosted AI assets"
             git push
           fi
