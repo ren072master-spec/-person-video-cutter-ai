@@ -18,18 +18,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download AI files
+      - name: Install AI files
         run: |
           set -eux
+          npm init -y
+
+          npm install \
+            @tensorflow/tfjs@4.22.0 \
+            @tensorflow-models/body-pix@2.2.1
+
           mkdir -p vendor
 
-          curl --fail --location --retry 4 \
-            https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js \
-            -o vendor/tf.min.js
+          cp node_modules/@tensorflow/tfjs/dist/tf.min.js \
+            vendor/tf.min.js
 
-          curl --fail --location --retry 4 \
-            https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.js \
-            -o vendor/body-pix.min.js
+          BODYPIX=$(find node_modules/@tensorflow-models/body-pix \
+            -type f \( -name "body-pix.min.js" -o -name "body-pix.js" -o -name "body_pix.js" \) \
+            | head -n 1)
+
+          test -n "$BODYPIX"
+
+          cp "$BODYPIX" vendor/body-pix.min.js
 
           test -s vendor/tf.min.js
           test -s vendor/body-pix.min.js
