@@ -1,6 +1,6 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ひとり切り抜き v13</title>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ひとり切り抜き v14</title>
 <style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f7;margin:0;color:#111}.w{max-width:720px;margin:auto;padding:24px}.c{background:#fff;padding:22px;border-radius:25px;margin:16px 0}h1{font-size:42px}button,input,select{font-size:17px;padding:15px;width:100%;margin:8px 0}button{border:0;border-radius:16px;font-weight:800}.stage{position:relative;background:#000;border-radius:18px;overflow:hidden}.stage video{display:block;width:100%;height:auto;min-height:260px;background:#000;object-fit:contain}.stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.hide{display:none}.ok{color:green}.bad{color:#a50}#result{width:100%;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 50%/24px 24px;border-radius:18px}.diag{font-size:12px;white-space:pre-wrap;color:#666}</style></head>
-<body><main class=w><small>iPhone Safari対応・自己ホストAI v13</small><h1>ひとり切り抜き</h1>
+<body><main class=w><small>iPhone Safari対応・自己ホストAI v14</small><h1>ひとり切り抜き</h1>
 <div class=c><h2>① AI</h2><p id=st>読み込み中…</p></div>
 <div class=c><h2>② 動画</h2><input id=f type=file accept="video/*,video/quicktime"><div id=m class=hide><div class=stage><video id=v controls playsinline webkit-playsinline preload="auto"></video><canvas id=o></canvas></div><p id=hint>中央の再生ボタンで再生し、人物が見える位置で停止してください。</p><button id=p>人物を指定</button><pre id=d class=diag></pre></div></div>
 <div id=cc class="c hide"><h2>③ 切り抜き</h2><select id=bg><option value=transparent>背景透明</option><option value=green>グリーン</option><option value=white>白</option><option value=black>黒</option></select><button id=go>このフレームをAI切り抜き</button><canvas id=r></canvas><p id=msg></p></div></main>
@@ -31,8 +31,36 @@ for(const other of preds){if(other===box)continue;let ox0=Math.max(x0,Math.floor
 function dilate(src){let dst=new Uint8Array(src.length);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){let on=0;for(let dy=-1;dy<=1&&!on;dy++)for(let dx=-1;dx<=1;dx++)if(src[(y+dy)*W+x+dx]){on=1;break}dst[y*W+x]=on}return dst}
 function erode(src){let dst=new Uint8Array(src.length);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){let on=1;for(let dy=-1;dy<=1&&on;dy++)for(let dx=-1;dx<=1;dx++)if(!src[(y+dy)*W+x+dx]){on=0;break}dst[y*W+x]=on}return dst}
 mask=erode(dilate(dilate(mask)));
+// Keep only the connected component nearest the user's tap.
+// This removes detached fragments from other people.
+let seedX=Math.max(0,Math.min(W-1,Math.round(px-x0))),seedY=Math.max(0,Math.min(H-1,Math.round(py-y0)));
+function nearestOnPixel(sx,sy){
+  if(mask[sy*W+sx])return [sx,sy];
+  let maxR=Math.max(W,H);
+  for(let rr=1;rr<maxR;rr++){
+    let xa=Math.max(0,sx-rr),xb=Math.min(W-1,sx+rr),ya=Math.max(0,sy-rr),yb=Math.min(H-1,sy+rr);
+    for(let x=xa;x<=xb;x++){if(mask[ya*W+x])return [x,ya];if(mask[yb*W+x])return [x,yb]}
+    for(let y=ya+1;y<yb;y++){if(mask[y*W+xa])return [xa,y];if(mask[y*W+xb])return [xb,y]}
+  }
+  return null;
+}
+let seed=nearestOnPixel(seedX,seedY);
+if(seed){
+  let keep=new Uint8Array(mask.length),qx=new Int32Array(mask.length),qy=new Int32Array(mask.length),head=0,tail=0;
+  qx[tail]=seed[0];qy[tail++]=seed[1];keep[seed[1]*W+seed[0]]=1;
+  const dx=[1,-1,0,0,1,1,-1,-1],dy=[0,0,1,-1,1,-1,1,-1];
+  while(head<tail){let x=qx[head],y=qy[head++];for(let k=0;k<8;k++){let nx=x+dx[k],ny=y+dy[k];if(nx<0||ny<0||nx>=W||ny>=H)continue;let ii=ny*W+nx;if(mask[ii]&&!keep[ii]){keep[ii]=1;qx[tail]=nx;qy[tail++]=ny}}}
+  mask=keep;
+}
+// Fill enclosed holes: flood-fill background from crop borders, then fill background not reachable from border.
+let outside=new Uint8Array(mask.length),q=new Int32Array(mask.length),qh=0,qt=0;
+function addBg(i){if(!mask[i]&&!outside[i]){outside[i]=1;q[qt++]=i}}
+for(let x=0;x<W;x++){addBg(x);addBg((H-1)*W+x)}
+for(let y=0;y<H;y++){addBg(y*W);addBg(y*W+W-1)}
+while(qh<qt){let i=q[qh++],x=i%W,y=(i/W)|0;if(x>0)addBg(i-1);if(x<W-1)addBg(i+1);if(y>0)addBg(i-W);if(y<H-1)addBg(i+W)}
+for(let i=0;i<mask.length;i++)if(!mask[i]&&!outside[i])mask[i]=1;
 let src=tc.getImageData(x0,y0,cw,ch),ctx=r.getContext('2d'),b=bg.value;ctx.clearRect(0,0,w,h);if(b!='transparent'){ctx.fillStyle=b=='green'?'#00ff00':b;ctx.fillRect(0,0,w,h)}
 let im=ctx.createImageData(cw,ch);for(let i=0;i<mask.length;i++)if(mask[i]){im.data[i*4]=src.data[i*4];im.data[i*4+1]=src.data[i*4+1];im.data[i*4+2]=src.data[i*4+2];im.data[i*4+3]=255}ctx.putImageData(im,x0,y0);
-msg.textContent='指定した1人を優先して切り抜きました ✓（人物検出: '+preds.length+'人）'}catch(e){msg.textContent='切り抜きエラー: '+e.message}};
+msg.textContent='指定した1人の連結領域だけ切り抜きました ✓（人物検出: '+preds.length+'人）'}catch(e){msg.textContent='切り抜きエラー: '+e.message}};
 boot();
 </script></body></html>
