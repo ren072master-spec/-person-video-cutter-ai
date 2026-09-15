@@ -1,0 +1,49 @@
+name: Build self-hosted AI assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-ai.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download AI files
+        run: |
+          set -eux
+          mkdir -p vendor
+
+          curl --fail --location --retry 4 \
+            https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js \
+            -o vendor/tf.min.js
+
+          curl --fail --location --retry 4 \
+            https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js \
+            -o vendor/body-pix.min.js
+
+          test -s vendor/tf.min.js
+          test -s vendor/body-pix.min.js
+
+      - name: Save AI files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add vendor/
+
+          if git diff --cached --quiet; then
+            echo "AI files already exist"
+          else
+            git commit -m "Build self-hosted AI assets"
+            git push
+          fi
