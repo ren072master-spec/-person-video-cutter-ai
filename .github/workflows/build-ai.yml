@@ -28,7 +28,7 @@ jobs:
             -o vendor/tf.min.js
 
           curl --fail --location --retry 4 \
-            https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js \
+            https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.js \
             -o vendor/body-pix.min.js
 
           test -s vendor/tf.min.js
