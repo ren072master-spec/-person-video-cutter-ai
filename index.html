@@ -1,26 +1,8 @@
-<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ひとり切り抜き v8</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f7;margin:0;color:#111}.wrap{max-width:760px;margin:auto;padding:28px 20px}h1{font-size:42px}.card{background:#fff;border-radius:28px;padding:22px;margin:18px 0}button{border:0;border-radius:18px;padding:18px;font-weight:800;font-size:17px;width:100%}video,canvas{width:100%;border-radius:20px;background:#000}.status{line-height:1.6;color:#555}.ok{color:#087a35}.bad{color:#a35b00}</style></head>
-<body><main class="wrap"><small>iPhone Safari対応・自己ホストAI v8</small><h1>ひとり切り抜き</h1>
-<div class="card"><h2>① AIを確認</h2><p id="status" class="status">AIファイルを確認中…</p>
-<button id="retry">AIを読み込む</button></div>
-<div class="card"><h2>② 動画を選ぶ</h2><input id="file" type="file" accept="video/*" disabled><br><br><video id="video" controls playsinline></video>
-<p>このv8は外部CDNからJavaScriptを直接読むのではなく、GitHub Actionsが <code>vendor/</code> にAIライブラリを保存してからPagesへ公開します。</p></div>
-</main>
-<script>
-const s=document.querySelector('#status'), f=document.querySelector('#file'), v=document.querySelector('#video');
-function script(src){return new Promise((ok,no)=>{let x=document.createElement('script');x.src=src;x.onload=ok;x.onerror=()=>no(new Error(src));document.head.appendChild(x)})}
-async function boot(){
- s.textContent='GitHub Pages内のAIファイルを読み込み中…'; s.className='status';
- try{
-  await script('./vendor/tf.min.js');
-  await script('./vendor/body-pix.min.js');
-  if(!window.tf||!window.bodyPix) throw Error('AIライブラリが見つかりません');
-  s.textContent='AIライブラリ準備OK。動画を選べます。';s.className='status ok';f.disabled=false;
- }catch(e){s.textContent='AIファイルがまだ生成されていません。GitHub Actions「Build self-hosted AI assets」を実行してください。\n'+e.message;s.className='status bad';}
-}
-document.querySelector('#retry').onclick=boot;
-f.onchange=()=>{if(f.files[0]){v.src=URL.createObjectURL(f.files[0]);v.load()}};
-boot();
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ひとり切り抜き v9</title><style>body{font-family:-apple-system,sans-serif;background:#f5f5f7;margin:0}.w{max-width:720px;margin:auto;padding:24px}.c{background:white;padding:22px;border-radius:24px;margin:16px 0}button,input,select{font-size:17px;padding:15px;width:100%;margin:8px 0}video,canvas{width:100%;background:#000;border-radius:18px}.s{position:relative}.s canvas{position:absolute;inset:0;height:100%;pointer-events:none}.hide{display:none}.ok{color:green}.bad{color:#a50}</style></head><body><main class=w><h1>ひとり切り抜き v9</h1><div class=c><h2>① AI</h2><p id=st>読み込み中…</p><button id=re>AIを再読み込み</button></div><div class=c><h2>② 動画</h2><input id=f type=file accept="video/*" disabled><div id=m class=hide><div class=s><video id=v controls playsinline></video><canvas id=o></canvas></div><button id=p>人物を指定</button></div></div><div id=cc class="c hide"><h2>③ 切り抜き</h2><select id=bg><option value=transparent>背景透明</option><option value=green>グリーン</option><option value=white>白</option><option value=black>黒</option></select><button id=go>このフレームをAI切り抜き</button><canvas id=r></canvas><p id=msg></p></div></main><script>
+const $=q=>document.querySelector(q),st=$('#st'),f=$('#f'),v=$('#v'),o=$('#o'),r=$('#r');let net,pick=false,pt;
+function js(src){return new Promise((a,b)=>{let x=document.createElement('script');x.src=src+'?v=9';x.onload=a;x.onerror=()=>b(Error(src));document.head.appendChild(x)})}
+async function boot(){try{st.textContent='自己ホストAIを読み込み中…';if(!window.tf)await js('./vendor/tf.min.js');if(!window.bodyPix)await js('./vendor/body-pix.min.js');await tf.ready();st.textContent='AI準備OK ✓';st.className='ok';f.disabled=false}catch(e){st.textContent='AI読込失敗: '+e.message;st.className='bad'}}
+re.onclick=boot;f.onchange=()=>{if(!f.files[0])return;v.src=URL.createObjectURL(f.files[0]);v.load();m.classList.remove('hide')};v.onloadedmetadata=()=>{o.width=r.width=v.videoWidth;o.height=r.height=v.videoHeight};p.onclick=()=>{pick=true;o.style.pointerEvents='auto';p.textContent='残したい人物をタップ'};
+o.onclick=e=>{let b=o.getBoundingClientRect();pt={x:(e.clientX-b.left)/b.width*o.width,y:(e.clientY-b.top)/b.height*o.height};let c=o.getContext('2d');c.clearRect(0,0,o.width,o.height);c.strokeStyle='red';c.lineWidth=5;c.beginPath();c.arc(pt.x,pt.y,30,0,7);c.stroke();pick=false;o.style.pointerEvents='none';p.textContent='指定済み（変更）';cc.classList.remove('hide')};
+go.onclick=async()=>{try{msg.textContent='解析中…';if(!net)net=await bodyPix.load({architecture:'MobileNetV1',outputStride:16,multiplier:.75,quantBytes:2});let seg=await net.segmentPerson(v,{internalResolution:'medium',segmentationThreshold:.7}),w=v.videoWidth,h=v.videoHeight,tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;let tc=tmp.getContext('2d');tc.drawImage(v,0,0,w,h);let src=tc.getImageData(0,0,w,h),ctx=r.getContext('2d'),im=ctx.createImageData(w,h),b=bg.value;ctx.clearRect(0,0,w,h);if(b!='transparent'){ctx.fillStyle=b=='green'?'#00ff00':b;ctx.fillRect(0,0,w,h)}for(let i=0;i<seg.data.length;i++)if(seg.data[i]){for(let k=0;k<3;k++)im.data[i*4+k]=src.data[i*4+k];im.data[i*4+3]=255}ctx.putImageData(im,0,0);msg.textContent='切り抜きプレビュー完成 ✓'}catch(e){msg.textContent='エラー: '+e.message}};boot();
 </script></body></html>
