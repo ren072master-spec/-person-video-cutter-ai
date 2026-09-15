@@ -18,33 +18,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install AI files
+      - name: Build AI files
         run: |
           set -eux
+
           npm init -y
 
           npm install \
             @tensorflow/tfjs@4.22.0 \
-            @tensorflow-models/body-pix@2.2.1
+            @tensorflow-models/body-pix@2.2.1 \
+            esbuild@0.25.9
 
           mkdir -p vendor
 
           cp node_modules/@tensorflow/tfjs/dist/tf.min.js \
             vendor/tf.min.js
 
-          BODYPIX=$(find node_modules/@tensorflow-models/body-pix \
-            -type f \( -name "body-pix.min.js" -o -name "body-pix.js" -o -name "body_pix.js" \) \
-            | head -n 1)
+          cat > bodypix-entry.js <<'EOF'
+          import * as bodyPix from '@tensorflow-models/body-pix';
+          window.bodyPix = bodyPix;
+          EOF
 
-          test -n "$BODYPIX"
-
-          cp "$BODYPIX" vendor/body-pix.min.js
+          npx esbuild bodypix-entry.js \
+            --bundle \
+            --minify \
+            --platform=browser \
+            --format=iife \
+            --external:@tensorflow/tfjs \
+            --outfile=vendor/body-pix.min.js
 
           test -s vendor/tf.min.js
           test -s vendor/body-pix.min.js
 
+          ls -lh vendor/
+
       - name: Save AI files
         run: |
+          set -eux
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
